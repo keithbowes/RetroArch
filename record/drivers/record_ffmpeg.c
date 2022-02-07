@@ -879,8 +879,9 @@ static bool ffmpeg_init_config(struct ff_config_param *params,
 static bool ffmpeg_init_muxer_pre(ffmpeg_t *handle)
 {
    ctx = avformat_alloc_context();
-   ctx->url = av_malloc(sizeof(ctx->url));
-   av_strlcpy(ctx->url, handle->params.filename, sizeof(ctx->url) + 1);
+   int len = strlen(handle->params.filename) + 1;
+   ctx->url = av_malloc(len);
+   av_strlcpy(ctx->url, handle->params.filename, len);
 
    if (*handle->config.format)
       ctx->oformat = av_guess_format(handle->config.format, NULL, NULL);
