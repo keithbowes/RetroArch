@@ -70,62 +70,16 @@ extern "C" {
 #include "../../retroarch.h"
 #include "../../verbosity.h"
 
-#ifndef AV_CODEC_FLAG_QSCALE
-#define AV_CODEC_FLAG_QSCALE CODEC_FLAG_QSCALE
-#endif
-
-#ifndef AV_CODEC_FLAG_GLOBAL_HEADER
-#define AV_CODEC_FLAG_GLOBAL_HEADER CODEC_FLAG_GLOBAL_HEADER
-#endif
-
-#ifndef AV_INPUT_BUFFER_MIN_SIZE
-#define AV_INPUT_BUFFER_MIN_SIZE FF_MIN_BUFFER_SIZE
-#endif
-
-#ifndef PIX_FMT_RGB32
-#define PIX_FMT_RGB32 AV_PIX_FMT_RGB32
-#endif
-
-#ifndef PIX_FMT_YUV444P
-#define PIX_FMT_YUV444P AV_PIX_FMT_YUV444P
-#endif
-
-#ifndef PIX_FMT_YUV420P
-#define PIX_FMT_YUV420P AV_PIX_FMT_YUV420P
-#endif
-
-#ifndef PIX_FMT_BGR24
-#define PIX_FMT_BGR24 AV_PIX_FMT_BGR24
-#endif
-
-#ifndef PIX_FMT_RGB24
-#define PIX_FMT_RGB24 AV_PIX_FMT_RGB24
-#endif
-
-#ifndef PIX_FMT_RGB8
-#define PIX_FMT_RGB8 AV_PIX_FMT_RGB8
-#endif
-
-#ifndef PIX_FMT_RGB565
-#define PIX_FMT_RGB565 AV_PIX_FMT_RGB565
-#endif
-
-#ifndef PIX_FMT_RGBA
-#define PIX_FMT_RGBA AV_PIX_FMT_RGBA
-#endif
-
-#ifndef PIX_FMT_NONE
-#define PIX_FMT_NONE AV_PIX_FMT_NONE
-#endif
-
-#ifndef PixelFormat
-#define PixelFormat AVPixelFormat
+#if LIBAVCODEC_VERSION_MAJOR >= 59
+#  define AV_CODEC const AVCodec
+#else
+#  define AV_CODEC AVCodec
 #endif
 
 struct ff_video_info
 {
    AVCodecContext *codec;
-   AVCodec *encoder;
+   AV_CODEC *encoder;
 
    AVFrame *conv_frame;
    uint8_t *conv_frame_buf;
@@ -135,9 +89,9 @@ struct ff_video_info
    size_t outbuf_size;
 
    /* Output pixel format. */
-   enum PixelFormat pix_fmt;
+   enum AVPixelFormat pix_fmt;
    /* Input pixel format. Only used by sws. */
-   enum PixelFormat in_pix_fmt;
+   enum AVPixelFormat in_pix_fmt;
 
    unsigned frame_drop_ratio;
    unsigned frame_drop_count;
@@ -155,7 +109,7 @@ struct ff_video_info
 struct ff_audio_info
 {
    AVCodecContext *codec;
-   AVCodec *encoder;
+   AV_CODEC *encoder;
 
    uint8_t *buffer;
    size_t frames_in_buffer;
@@ -204,7 +158,7 @@ struct ff_config_param
    char vcodec[64];
    char acodec[64];
    char format[64];
-   enum PixelFormat out_pix_fmt;
+   enum AVPixelFormat out_pix_fmt;
    unsigned threads;
    unsigned frame_drop_ratio;
    unsigned sample_rate;
@@ -336,7 +290,7 @@ static bool ffmpeg_init_audio(ffmpeg_t *handle, const char *audio_resampler)
    struct ff_config_param *params  = &handle->config;
    struct ff_audio_info *audio     = &handle->audio;
    struct record_params *param     = &handle->params;
-   AVCodec *codec                  = avcodec_find_encoder_by_name(
+   AV_CODEC *codec                  = avcodec_find_encoder_by_name(
          *params->acodec ? params->acodec : "flac");
    if (!codec)
    {
@@ -427,7 +381,7 @@ static bool ffmpeg_init_video(ffmpeg_t *handle)
    struct ff_config_param *params  = &handle->config;
    struct ff_video_info *video     = &handle->video;
    struct record_params *param     = &handle->params;
-   AVCodec *codec                  = NULL;
+   AV_CODEC *codec                  = NULL;
 
    if (*params->vcodec)
       codec = avcodec_find_encoder_by_name(params->vcodec);
@@ -454,19 +408,19 @@ static bool ffmpeg_init_video(ffmpeg_t *handle)
     * and it's non-trivial to fix upstream as it's heavily geared towards YUV.
     * If we're dealing with strange formats or YUV, just use libswscale.
     */
-   if (params->out_pix_fmt != PIX_FMT_NONE)
+   if (params->out_pix_fmt != AV_PIX_FMT_NONE)
    {
       video->pix_fmt = params->out_pix_fmt;
-      if (video->pix_fmt != PIX_FMT_BGR24 && video->pix_fmt != PIX_FMT_RGB32)
+      if (video->pix_fmt != AV_PIX_FMT_BGR24 && video->pix_fmt != AV_PIX_FMT_RGB32)
          video->use_sws = true;
 
       switch (video->pix_fmt)
       {
-         case PIX_FMT_BGR24:
+         case AV_PIX_FMT_BGR24:
             video->scaler.out_fmt = SCALER_FMT_BGR24;
             break;
 
-         case PIX_FMT_RGB32:
+         case AV_PIX_FMT_RGB32:
             video->scaler.out_fmt = SCALER_FMT_ARGB8888;
             break;
 
@@ -476,7 +430,7 @@ static bool ffmpeg_init_video(ffmpeg_t *handle)
    }
    else /* Use BGR24 as default out format. */
    {
-      video->pix_fmt        = PIX_FMT_BGR24;
+      video->pix_fmt        = AV_PIX_FMT_BGR24;
       video->scaler.out_fmt = SCALER_FMT_BGR24;
    }
 
@@ -484,19 +438,19 @@ static bool ffmpeg_init_video(ffmpeg_t *handle)
    {
       case FFEMU_PIX_RGB565:
          video->scaler.in_fmt = SCALER_FMT_RGB565;
-         video->in_pix_fmt    = PIX_FMT_RGB565;
+         video->in_pix_fmt    = AV_PIX_FMT_RGB565;
          video->pix_size      = 2;
          break;
 
       case FFEMU_PIX_BGR24:
          video->scaler.in_fmt = SCALER_FMT_BGR24;
-         video->in_pix_fmt    = PIX_FMT_BGR24;
+         video->in_pix_fmt    = AV_PIX_FMT_BGR24;
          video->pix_size      = 3;
          break;
 
       case FFEMU_PIX_ARGB8888:
          video->scaler.in_fmt = SCALER_FMT_ARGB8888;
-         video->in_pix_fmt    = PIX_FMT_RGB32;
+         video->in_pix_fmt    = AV_PIX_FMT_RGB32;
          video->pix_size      = 4;
          break;
 
@@ -577,7 +531,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 1;
          params->audio_enable         = true;
          params->audio_global_quality = 75;
-         params->out_pix_fmt          = PIX_FMT_YUV420P;
+         params->out_pix_fmt          = AV_PIX_FMT_YUV420P;
 
          strlcpy(params->vcodec, "libx264", sizeof(params->vcodec));
          strlcpy(params->acodec, "aac", sizeof(params->acodec));
@@ -593,7 +547,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 1;
          params->audio_enable         = true;
          params->audio_global_quality = 75;
-         params->out_pix_fmt          = PIX_FMT_YUV420P;
+         params->out_pix_fmt          = AV_PIX_FMT_YUV420P;
 
          strlcpy(params->vcodec, "libx264", sizeof(params->vcodec));
          strlcpy(params->acodec, "aac", sizeof(params->acodec));
@@ -609,7 +563,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 1;
          params->audio_enable         = true;
          params->audio_global_quality = 100;
-         params->out_pix_fmt          = PIX_FMT_YUV420P;
+         params->out_pix_fmt          = AV_PIX_FMT_YUV420P;
 
          strlcpy(params->vcodec, "libx264", sizeof(params->vcodec));
          strlcpy(params->acodec, "aac", sizeof(params->acodec));
@@ -624,7 +578,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 1;
          params->audio_enable         = true;
          params->audio_global_quality = 80;
-         params->out_pix_fmt          = PIX_FMT_BGR24;
+         params->out_pix_fmt          = AV_PIX_FMT_BGR24;
 
          strlcpy(params->vcodec, "libx264rgb", sizeof(params->vcodec));
          strlcpy(params->acodec, "flac", sizeof(params->acodec));
@@ -637,7 +591,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 1;
          params->audio_enable         = true;
          params->audio_global_quality = 50;
-         params->out_pix_fmt          = PIX_FMT_YUV420P;
+         params->out_pix_fmt          = AV_PIX_FMT_YUV420P;
 
          strlcpy(params->vcodec, "libvpx", sizeof(params->vcodec));
          strlcpy(params->acodec, "libopus", sizeof(params->acodec));
@@ -651,7 +605,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 1;
          params->audio_enable         = true;
          params->audio_global_quality = 75;
-         params->out_pix_fmt          = PIX_FMT_YUV420P;
+         params->out_pix_fmt          = AV_PIX_FMT_YUV420P;
 
          strlcpy(params->vcodec, "libvpx", sizeof(params->vcodec));
          strlcpy(params->acodec, "libopus", sizeof(params->acodec));
@@ -665,7 +619,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 4;
          params->audio_enable         = false;
          params->audio_global_quality = 0;
-         params->out_pix_fmt          = PIX_FMT_RGB8;
+         params->out_pix_fmt          = AV_PIX_FMT_RGB8;
 
          strlcpy(params->vcodec, "gif", sizeof(params->vcodec));
          strlcpy(params->acodec, "", sizeof(params->acodec));
@@ -678,7 +632,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 1;
          params->audio_enable         = false;
          params->audio_global_quality = 0;
-         params->out_pix_fmt          = PIX_FMT_RGB24;
+         params->out_pix_fmt          = AV_PIX_FMT_RGB24;
 
          strlcpy(params->vcodec, "apng", sizeof(params->vcodec));
          strlcpy(params->acodec, "", sizeof(params->acodec));
@@ -691,7 +645,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
          params->frame_drop_ratio     = 1;
          params->audio_enable         = true;
          params->audio_global_quality = 50;
-         params->out_pix_fmt          = PIX_FMT_YUV420P;
+         params->out_pix_fmt          = AV_PIX_FMT_YUV420P;
 
          strlcpy(params->vcodec, "libx264", sizeof(params->vcodec));
          strlcpy(params->acodec, "aac", sizeof(params->acodec));
@@ -798,7 +752,7 @@ static bool ffmpeg_init_config(struct ff_config_param *params,
    struct config_file_entry entry;
    char pix_fmt[64]         = {0};
 
-   params->out_pix_fmt      = PIX_FMT_NONE;
+   params->out_pix_fmt      = AV_PIX_FMT_NONE;
    params->scale_factor     = 1;
    params->threads          = 1;
    params->frame_drop_ratio = 1;
@@ -844,7 +798,7 @@ static bool ffmpeg_init_config(struct ff_config_param *params,
    if (config_get_array(params->conf, "pix_fmt", pix_fmt, sizeof(pix_fmt)))
    {
       params->out_pix_fmt = av_get_pix_fmt(pix_fmt);
-      if (params->out_pix_fmt == PIX_FMT_NONE)
+      if (params->out_pix_fmt == AV_PIX_FMT_NONE)
       {
          RARCH_ERR("[FFmpeg] Cannot find pix_fmt \"%s\".\n", pix_fmt);
          return false;

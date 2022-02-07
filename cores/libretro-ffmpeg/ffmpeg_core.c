@@ -61,6 +61,12 @@ extern "C" {
 #define CORE_PREFIX(s) s
 #endif
 
+#if LIBAVCODEC_VERSION_MAJOR >= 59
+#  define AV_CODEC const AVCodec
+#else
+#  define AV_CODEC AVCodec
+#endif
+
 #define PRINT_VERSION(s) log_cb(RETRO_LOG_INFO, "[FFMPEG] lib%s version:\t%d.%d.%d\n", #s, \
    s ##_version() >> 16 & 0xFF, \
    s ##_version() >> 8 & 0xFF, \
@@ -973,7 +979,7 @@ static enum AVPixelFormat init_hw_decoder(struct AVCodecContext *ctx,
 {
    int ret = 0;
    enum AVPixelFormat decoder_pix_fmt = AV_PIX_FMT_NONE;
-   struct AVCodec *codec = avcodec_find_decoder(fctx->streams[video_stream_index]->codecpar->codec_id);
+   AV_CODEC *codec = avcodec_find_decoder(fctx->streams[video_stream_index]->codecpar->codec_id);
 
    for (int i = 0;; i++)
    {
@@ -1109,7 +1115,7 @@ static bool open_codec(AVCodecContext **ctx, enum AVMediaType type, unsigned ind
 {
    int ret = 0;
 
-   AVCodec *codec = avcodec_find_decoder(fctx->streams[index]->codecpar->codec_id);
+   AV_CODEC *codec = avcodec_find_decoder(fctx->streams[index]->codecpar->codec_id);
    if (!codec)
    {
       log_cb(RETRO_LOG_ERROR, "[FFMPEG] Couldn't find suitable decoder\n");
