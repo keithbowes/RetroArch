@@ -70,9 +70,7 @@ video_buffer_t *video_buffer_create(
       b->buffer[i].pts       = 0;
       b->buffer[i].sws       = sws_alloc_context();
       b->buffer[i].source    = av_frame_alloc();
-#if LIBAVUTIL_VERSION_MAJOR > 55
       b->buffer[i].hw_source = av_frame_alloc();
-#endif
       b->buffer[i].target    = av_frame_alloc();
 
       AVFrame* frame = b->buffer[i].target;
@@ -81,9 +79,7 @@ video_buffer_t *video_buffer_create(
 
       if (!b->buffer[i].sws       ||
           !b->buffer[i].source    ||
-#if LIBAVUTIL_VERSION_MAJOR > 55
           !b->buffer[i].hw_source ||
-#endif
           !b->buffer[i].target)
          goto fail;
    }
@@ -108,9 +104,7 @@ void video_buffer_destroy(video_buffer_t *video_buffer)
    {
       for (i = 0; i < video_buffer->capacity; i++)
       {
-#if LIBAVUTIL_VERSION_MAJOR > 55
          av_frame_free(&video_buffer->buffer[i].hw_source);
-#endif
          av_frame_free(&video_buffer->buffer[i].source);
          av_freep((AVFrame*)video_buffer->buffer[i].target);
          av_frame_free(&video_buffer->buffer[i].target);

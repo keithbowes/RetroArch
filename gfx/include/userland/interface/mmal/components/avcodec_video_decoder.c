@@ -33,15 +33,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define attribute_deprecated
 #include "libavcodec/avcodec.h"
 #include "libavutil/mathematics.h"
-#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT( 52, 23, 0 )
-# include "libavformat/avformat.h"
- static AVPacket null_packet = {AV_NOPTS_VALUE, AV_NOPTS_VALUE};
-# define av_init_packet(a) *(a) = null_packet
-#endif
-
-#if LIBAVCODEC_VERSION_MAJOR < 53
-# define avcodec_decode_video2(a,b,c,d) avcodec_decode_video(a,b,c,(d)->data,(d)->size)
-#endif
 
 /* Buffering requirements */
 #define INPUT_MIN_BUFFER_SIZE (800*1024)
@@ -527,9 +518,7 @@ static struct {
    {MMAL_ENCODING_WMV1,    CODEC_ID_WMV1},
    {MMAL_ENCODING_WVC1,    CODEC_ID_VC1},
    {MMAL_ENCODING_VP6,     CODEC_ID_VP6},
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT( 52, 68, 2 )
    {MMAL_ENCODING_VP8,     CODEC_ID_VP8},
-#endif
    {MMAL_ENCODING_THEORA,  CODEC_ID_THEORA},
 
    {MMAL_ENCODING_GIF,  CODEC_ID_GIF},
