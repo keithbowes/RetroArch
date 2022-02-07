@@ -450,12 +450,12 @@ check_lib '' DRMINGW -lexchndl
 check_enabled THREADS FFMPEG FFmpeg 'Threads are' false
 
 if [ "$HAVE_FFMPEG" != 'no' ]; then
-   check_val '' AVCODEC -lavcodec '' libavcodec 57 '' false
-   check_val '' AVFORMAT -lavformat '' libavformat 57 '' false
-   check_val '' AVDEVICE -lavdevice '' libavdevice 57 '' false
-   check_val '' SWRESAMPLE -lswresample '' libswresample 2 '' false
-   check_val '' AVUTIL -lavutil '' libavutil 55 '' false
-   check_val '' SWSCALE -lswscale '' libswscale 4 '' false
+   check_val '' AVCODEC -lavcodec '' libavcodec 58 '' false
+   check_val '' AVFORMAT -lavformat '' libavformat 58 '' false
+   check_val '' AVDEVICE -lavdevice '' libavdevice 58 '' false
+   check_val '' SWRESAMPLE -lswresample '' libswresample 3 '' false
+   check_val '' AVUTIL -lavutil '' libavutil 56 '' false
+   check_val '' SWSCALE -lswscale '' libswscale 5 '' false
 
    check_header '' AV_CHANNEL_LAYOUT libavutil/channel_layout.h
 
