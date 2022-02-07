@@ -364,7 +364,7 @@ static bool ffmpeg_init_audio(ffmpeg_t *handle, const char *audio_resampler)
 
    if (params->sample_rate)
    {
-      audio->ratio              = (double)params->sample_rate 
+      audio->ratio              = (double)params->sample_rate
          / param->samplerate;
       audio->codec->sample_rate = params->sample_rate;
       audio->codec->time_base   = av_d2q(1.0 / params->sample_rate, 1000000);
@@ -762,7 +762,7 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
             video_stream_scale_factor : 1;
       else
          params->scale_factor = 1;
-      if (  streaming_mode == STREAMING_MODE_YOUTUBE || 
+      if (  streaming_mode == STREAMING_MODE_YOUTUBE ||
             streaming_mode == STREAMING_MODE_TWITCH ||
             streaming_mode == STREAMING_MODE_FACEBOOK)
          strlcpy(params->format, "flv", sizeof(params->format));
@@ -879,7 +879,8 @@ static bool ffmpeg_init_config(struct ff_config_param *params,
 static bool ffmpeg_init_muxer_pre(ffmpeg_t *handle)
 {
    ctx = avformat_alloc_context();
-   av_strlcpy(ctx->url, handle->params.filename, sizeof(ctx->url));
+   ctx->url = av_malloc(sizeof(ctx->url));
+   av_strlcpy(ctx->url, handle->params.filename, sizeof(ctx->url) + 1);
 
    if (*handle->config.format)
       ctx->oformat = av_guess_format(handle->config.format, NULL, NULL);
@@ -1039,6 +1040,8 @@ static void ffmpeg_free(void *data)
    av_free(handle->audio.resample_out);
    av_free(handle->audio.fixed_conv);
    av_free(handle->audio.planar_buf);
+   av_free(handle->muxer.ctx->url);
+   av_free(handle->muxer.ctx);
 
    free(handle);
 }
@@ -1081,7 +1084,7 @@ static void *ffmpeg_new(const struct record_params *params)
    if (!ffmpeg_init_video(handle))
       goto error;
 
-   if (handle->config.audio_enable && 
+   if (handle->config.audio_enable &&
          !ffmpeg_init_audio(handle,
             params->audio_resampler))
       goto error;
@@ -1259,7 +1262,7 @@ static bool encode_video(ffmpeg_t *handle, AVFrame *frame)
       pkt.dts = av_rescale_q(pkt.dts,
          handle->video.codec->time_base,
          handle->muxer.vstream->time_base);
-      
+
       pkt.stream_index = handle->muxer.vstream->index;
 
       ret = av_interleaved_write_frame(handle->muxer.ctx, &pkt);
@@ -1407,7 +1410,7 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
    avcodec_fill_audio_frame(frame,
          handle->audio.codec->channels,
          handle->audio.codec->sample_fmt,
-         handle->audio.is_planar 
+         handle->audio.is_planar
          ? (uint8_t*)handle->audio.planar_buf :
          handle->audio.buffer,
          samples_size, 0);
@@ -1424,7 +1427,7 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
       return false;
    }
 
-   while (ret >= 0) 
+   while (ret >= 0)
    {
       ret = avcodec_receive_packet(handle->audio.codec, &pkt);
       if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
@@ -1482,7 +1485,7 @@ static void ffmpeg_audio_resample(ffmpeg_t *handle,
 
       handle->audio.float_conv_frames   = aud->frames;
       /* To make sure we don't accidentially overflow. */
-      handle->audio.resample_out_frames = aud->frames 
+      handle->audio.resample_out_frames = aud->frames
          * handle->audio.ratio + 16;
       handle->audio.resample_out        = (float*)
          av_realloc(handle->audio.resample_out,
@@ -1496,7 +1499,7 @@ static void ffmpeg_audio_resample(ffmpeg_t *handle,
             handle->audio.float_conv_frames);
       handle->audio.fixed_conv        = (int16_t*)av_realloc(
             handle->audio.fixed_conv,
-            handle->audio.fixed_conv_frames * 
+            handle->audio.fixed_conv_frames *
             handle->params.channels * sizeof(int16_t));
 
       if (!handle->audio.fixed_conv)
@@ -1506,7 +1509,7 @@ static void ffmpeg_audio_resample(ffmpeg_t *handle,
    if (handle->audio.use_float || handle->audio.resampler)
    {
       convert_s16_to_float(handle->audio.float_conv,
-            (const int16_t*)aud->data, aud->frames 
+            (const int16_t*)aud->data, aud->frames
             * handle->params.channels, 1.0);
       aud->data = handle->audio.float_conv;
    }
