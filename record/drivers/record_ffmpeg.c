@@ -828,7 +828,7 @@ static bool ffmpeg_init_config(struct ff_config_param *params,
 static bool ffmpeg_init_muxer_pre(ffmpeg_t *handle)
 {
    ctx = avformat_alloc_context();
-   int len = strlen(handle->params.filename) + 1;
+   size_t len = strlen(handle->params.filename) + 1;
    ctx->url = av_malloc(len);
    av_strlcpy(ctx->url, handle->params.filename, len);
 
@@ -1348,6 +1348,7 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
    frame->format         = handle->audio.codec->sample_fmt;
    frame->channel_layout = handle->audio.codec->channel_layout;
    frame->pts            = handle->audio.frame_cnt;
+   av_frame_get_buffer(frame, 0);
 
    planarize_audio(handle);
 
@@ -1434,7 +1435,7 @@ static void ffmpeg_audio_resample(ffmpeg_t *handle,
          return;
 
       handle->audio.float_conv_frames   = aud->frames;
-      /* To make sure we don't accidentially overflow. */
+      /* To make sure we don't accidentally overflow. */
       handle->audio.resample_out_frames = aud->frames
          * handle->audio.ratio + 16;
       handle->audio.resample_out        = (float*)
