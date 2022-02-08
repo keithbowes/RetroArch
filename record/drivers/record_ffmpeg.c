@@ -70,16 +70,10 @@ extern "C" {
 #include "../../retroarch.h"
 #include "../../verbosity.h"
 
-#if LIBAVCODEC_VERSION_MAJOR >= 59
-#  define AV_CODEC const AVCodec
-#else
-#  define AV_CODEC AVCodec
-#endif
-
 struct ff_video_info
 {
    AVCodecContext *codec;
-   AV_CODEC *encoder;
+   const AVCodec *encoder;
 
    AVFrame *conv_frame;
    uint8_t *conv_frame_buf;
@@ -109,7 +103,7 @@ struct ff_video_info
 struct ff_audio_info
 {
    AVCodecContext *codec;
-   AV_CODEC *encoder;
+   const AVCodec *encoder;
 
    uint8_t *buffer;
    size_t frames_in_buffer;
@@ -290,7 +284,7 @@ static bool ffmpeg_init_audio(ffmpeg_t *handle, const char *audio_resampler)
    struct ff_config_param *params  = &handle->config;
    struct ff_audio_info *audio     = &handle->audio;
    struct record_params *param     = &handle->params;
-   AV_CODEC *codec                  = avcodec_find_encoder_by_name(
+   const AVCodec *codec            = avcodec_find_encoder_by_name(
          *params->acodec ? params->acodec : "flac");
    if (!codec)
    {
@@ -381,7 +375,7 @@ static bool ffmpeg_init_video(ffmpeg_t *handle)
    struct ff_config_param *params  = &handle->config;
    struct ff_video_info *video     = &handle->video;
    struct record_params *param     = &handle->params;
-   AV_CODEC *codec                  = NULL;
+   const AVCodec *codec            = NULL;
 
    if (*params->vcodec)
       codec = avcodec_find_encoder_by_name(params->vcodec);
