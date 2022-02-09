@@ -74,6 +74,7 @@ struct ff_video_info
 {
    AVCodecContext *codec;
    const AVCodec *encoder;
+   AVPacket *pkt;
 
    AVFrame *conv_frame;
    uint8_t *conv_frame_buf;
@@ -104,6 +105,7 @@ struct ff_audio_info
 {
    AVCodecContext *codec;
    const AVCodec *encoder;
+   AVPacket *pkt;
 
    uint8_t *buffer;
    size_t frames_in_buffer;
@@ -721,25 +723,6 @@ static bool ffmpeg_init_config_common(struct ff_config_param *params,
    return true;
 }
 
-/*
-static bool ffmpeg_init_config_recording(struct ff_config_param *params)
-{
-   return true;
-   params->threads              = 0;
-   params->audio_global_quality = 100;
-
-   strlcpy(params->vcodec, "libx264rgb", sizeof(params->vcodec));
-   strlcpy(params->format, "matroska", sizeof(params->format));
-
-   av_dict_set(&params->video_opts, "video_preset", "slow", 0);
-   av_dict_set(&params->video_opts, "video_tune", "film", 0);
-   av_dict_set(&params->video_opts, "video_crf", "10", 0);
-   av_dict_set(&params->audio_opts, "audio_global_quality", "100", 0);
-
-   return true;
-}
-*/
-
 static bool ffmpeg_init_config(struct ff_config_param *params,
       const char *config)
 {
@@ -840,6 +823,8 @@ static bool ffmpeg_init_muxer_pre(ffmpeg_t *handle)
       return false;
    }
 
+   handle->audio.pkt = av_packet_alloc();
+   handle->video.pkt = av_packet_alloc();
    handle->muxer.ctx = ctx;
    return true;
 }
@@ -986,6 +971,8 @@ static void ffmpeg_free(void *data)
    av_free(handle->audio.planar_buf);
    av_free(handle->muxer.ctx->url);
    av_free(handle->muxer.ctx);
+   av_packet_free(&handle->audio.pkt);
+   av_packet_free(&handle->video.pkt);
 
    free(handle);
 }
@@ -1167,12 +1154,12 @@ static bool ffmpeg_push_audio(void *data,
 
 static bool encode_video(ffmpeg_t *handle, AVFrame *frame)
 {
-   AVPacket pkt;
+   AVPacket *pkt;
    int ret;
 
-   av_init_packet(&pkt);
-   pkt.data = handle->video.outbuf;
-   pkt.size = handle->video.outbuf_size;
+   pkt = handle->video.pkt;
+   pkt->data = handle->video.outbuf;
+   pkt->size = handle->video.outbuf_size;
 
    ret = avcodec_send_frame(handle->video.codec, frame);
    if (ret < 0)
@@ -1187,7 +1174,7 @@ static bool encode_video(ffmpeg_t *handle, AVFrame *frame)
 
    while (ret >= 0)
    {
-      ret = avcodec_receive_packet(handle->video.codec, &pkt);
+      ret = avcodec_receive_packet(handle->video.codec, pkt);
       if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
          break;
       else if (ret < 0)
@@ -1200,16 +1187,17 @@ static bool encode_video(ffmpeg_t *handle, AVFrame *frame)
          return false;
       }
 
-      pkt.pts = av_rescale_q(pkt.pts, handle->video.codec->time_base,
-         handle->muxer.vstream->time_base);
-
-      pkt.dts = av_rescale_q(pkt.dts,
+      pkt->pts = av_rescale_q(pkt->pts,
          handle->video.codec->time_base,
          handle->muxer.vstream->time_base);
 
-      pkt.stream_index = handle->muxer.vstream->index;
+      pkt->dts = av_rescale_q(pkt->dts,
+         handle->video.codec->time_base,
+         handle->muxer.vstream->time_base);
 
-      ret = av_interleaved_write_frame(handle->muxer.ctx, &pkt);
+      pkt->stream_index = handle->muxer.vstream->index;
+
+      ret = av_interleaved_write_frame(handle->muxer.ctx, pkt);
       if (ret < 0)
       {
 #ifdef __cplusplus
@@ -1219,6 +1207,8 @@ static bool encode_video(ffmpeg_t *handle, AVFrame *frame)
 #endif
          return false;
       }
+
+      av_packet_unref(pkt);
    }
    return true;
 }
@@ -1324,14 +1314,14 @@ static void planarize_audio(ffmpeg_t *handle)
 static bool encode_audio(ffmpeg_t *handle, bool dry)
 {
    AVFrame *frame;
-   AVPacket pkt;
+   AVPacket *pkt;
    int samples_size;
    int ret;
 
-   av_init_packet(&pkt);
+   pkt = handle->audio.pkt;
 
-   pkt.data = handle->audio.outbuf;
-   pkt.size = handle->audio.outbuf_size;
+   pkt->data = handle->audio.outbuf;
+   pkt->size = handle->audio.outbuf_size;
 
    frame    = av_frame_alloc();
 
@@ -1374,7 +1364,7 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
 
    while (ret >= 0)
    {
-      ret = avcodec_receive_packet(handle->audio.codec, &pkt);
+      ret = avcodec_receive_packet(handle->audio.codec, pkt);
       if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
          break;
       else if (ret < 0)
@@ -1388,17 +1378,17 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
          return false;
       }
 
-      pkt.pts = av_rescale_q(pkt.pts,
+      pkt->pts = av_rescale_q(pkt->pts,
          handle->audio.codec->time_base,
          handle->muxer.astream->time_base);
 
-      pkt.dts = av_rescale_q(pkt.dts,
+      pkt->dts = av_rescale_q(pkt->dts,
          handle->audio.codec->time_base,
          handle->muxer.astream->time_base);
 
-      pkt.stream_index = handle->muxer.astream->index;
+      pkt->stream_index = handle->muxer.astream->index;
 
-      ret = av_interleaved_write_frame(handle->muxer.ctx, &pkt);
+      ret = av_interleaved_write_frame(handle->muxer.ctx, pkt);
       if (ret < 0)
       {
          av_frame_free(&frame);
@@ -1409,6 +1399,8 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
 #endif
          return false;
       }
+
+      av_packet_unref(pkt);
    }
 
    av_frame_free(&frame);
