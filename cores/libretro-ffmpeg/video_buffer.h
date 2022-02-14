@@ -31,9 +31,11 @@ extern "C" {
 
 RETRO_BEGIN_DECLS
 
-#ifndef PIX_FMT_RGB32
-#define PIX_FMT_RGB32 AV_PIX_FMT_RGB32
-#endif
+/* If libavutil is at least version 55,
+ * and if libavcodec is at least version 57.80.100,
+ * enable hardware acceleration */
+#define ENABLE_HW_ACCEL ((LIBAVUTIL_VERSION_MAJOR >= 55) && \
+      (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 80, 100)))
 
 /**
  * video_decoder_context
@@ -46,7 +48,9 @@ struct video_decoder_context
    int64_t pts;
    struct SwsContext *sws;
    AVFrame *source;
+#if ENABLE_HW_ACCEL
    AVFrame *hw_source;
+#endif
    AVFrame *target;
 #ifdef HAVE_SSA
    ASS_Track *ass_track_active;

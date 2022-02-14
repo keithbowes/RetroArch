@@ -70,11 +70,12 @@ extern "C" {
 #include "../../retroarch.h"
 #include "../../verbosity.h"
 
+#define FFMPEG3 (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 10, 100))
+
 struct ff_video_info
 {
    AVCodecContext *codec;
    const AVCodec *encoder;
-   AVPacket *pkt;
 
    AVFrame *conv_frame;
    uint8_t *conv_frame_buf;
@@ -105,7 +106,6 @@ struct ff_audio_info
 {
    AVCodecContext *codec;
    const AVCodec *encoder;
-   AVPacket *pkt;
 
    uint8_t *buffer;
    size_t frames_in_buffer;
@@ -181,6 +181,8 @@ typedef struct ffmpeg
    struct ff_config_param config;
 
    struct record_params params;
+
+   AVPacket *pkt;
 
    scond_t *cond;
    slock_t *cond_lock;
@@ -354,10 +356,6 @@ static bool ffmpeg_init_audio(ffmpeg_t *handle, const char *audio_resampler)
          audio->codec->frame_size *
          audio->codec->channels *
          audio->sample_size);
-
-#if 0
-   RARCH_LOG("[FFmpeg]: Audio frame size: %d.\n", audio->codec->frame_size);
-#endif
 
    if (!audio->buffer)
       return false;
@@ -805,27 +803,34 @@ static bool ffmpeg_init_config(struct ff_config_param *params,
 static bool ffmpeg_init_muxer_pre(ffmpeg_t *handle)
 {
    ctx = avformat_alloc_context();
-   size_t len = strlen(handle->params.filename) + 1;
+   handle->muxer.ctx = ctx;
+#if !FFMPEG3
+   unsigned short int len = MIN(strlen(handle->params.filename) + 1, PATH_MAX_LENGTH);
    ctx->url = av_malloc(len);
    av_strlcpy(ctx->url, handle->params.filename, len);
+#else
+   av_strlcpy(ctx->filename, handle->params.filename, sizeof(ctx->filename));
+#endif
 
    if (*handle->config.format)
       ctx->oformat = av_guess_format(handle->config.format, NULL, NULL);
    else
+#if !FFMPEG3
       ctx->oformat = av_guess_format(NULL, ctx->url, NULL);
+#else
+      ctx->oformat = av_guess_format(NULL, ctx->filename, NULL);
+#endif
 
    if (!ctx->oformat)
       return false;
 
+#if !FFMPEG3
    if (avio_open(&ctx->pb, ctx->url, AVIO_FLAG_WRITE) < 0)
-   {
-      av_free(ctx);
+#else
+   if (avio_open(&ctx->pb, ctx->filename, AVIO_FLAG_WRITE) < 0)
+#endif
       return false;
-   }
 
-   handle->audio.pkt = av_packet_alloc();
-   handle->video.pkt = av_packet_alloc();
-   handle->muxer.ctx = ctx;
    return true;
 }
 
@@ -969,12 +974,17 @@ static void ffmpeg_free(void *data)
    av_free(handle->audio.resample_out);
    av_free(handle->audio.fixed_conv);
    av_free(handle->audio.planar_buf);
+#if !FFMPEG3
    av_free(handle->muxer.ctx->url);
+#endif
    av_free(handle->muxer.ctx);
-   av_packet_free(&handle->audio.pkt);
-   av_packet_free(&handle->video.pkt);
+   av_packet_free(&handle->pkt);
 
    free(handle);
+
+#if FFMPEG3
+   avformat_network_deinit();
+#endif
 }
 
 static void *ffmpeg_new(const struct record_params *params)
@@ -983,9 +993,13 @@ static void *ffmpeg_new(const struct record_params *params)
    if (!handle)
       return NULL;
 
+#if FFMPEG3
+   av_register_all();
    avformat_network_init();
+#endif
 
    handle->params       = *params;
+   handle->pkt          = av_packet_alloc();
 
    switch (params->preset)
    {
@@ -1157,7 +1171,7 @@ static bool encode_video(ffmpeg_t *handle, AVFrame *frame)
    AVPacket *pkt;
    int ret;
 
-   pkt = handle->video.pkt;
+   pkt = handle->pkt;
    pkt->data = handle->video.outbuf;
    pkt->size = handle->video.outbuf_size;
 
@@ -1318,7 +1332,7 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
    int samples_size;
    int ret;
 
-   pkt = handle->audio.pkt;
+   pkt = handle->pkt;
 
    pkt->data = handle->audio.outbuf;
    pkt->size = handle->audio.outbuf_size;
@@ -1332,7 +1346,6 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
    frame->format         = handle->audio.codec->sample_fmt;
    frame->channel_layout = handle->audio.codec->channel_layout;
    frame->pts            = handle->audio.frame_cnt;
-   av_frame_get_buffer(frame, 0);
 
    planarize_audio(handle);
 
@@ -1342,6 +1355,7 @@ static bool encode_audio(ffmpeg_t *handle, bool dry)
          handle->audio.frames_in_buffer,
          handle->audio.codec->sample_fmt, 0);
 
+   av_frame_get_buffer(frame, 0);
    avcodec_fill_audio_frame(frame,
          handle->audio.codec->channels,
          handle->audio.codec->sample_fmt,
