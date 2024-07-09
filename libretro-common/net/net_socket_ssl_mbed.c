@@ -83,6 +83,10 @@ void* ssl_socket_init(int fd, const char *domain)
 
    state->domain           = domain;
 
+#if defined(MBEDTLS_USE_PSA_CRYPTO)
+   psa_crypto_init();
+#endif
+
 #if defined(MBEDTLS_DEBUG_C)
    mbedtls_debug_set_threshold(DEBUG_LEVEL);
 #endif
@@ -209,11 +213,11 @@ int ssl_socket_receive_all_blocking(void *state_data,
 
    for (;;)
    {
-      /* mbedtls_ssl_read wants non-const data but it only reads it, 
+      /* mbedtls_ssl_read wants non-const data but it only reads it,
        * so this cast is safe */
       int ret = mbedtls_ssl_read(&state->ctx, (unsigned char*)data, size);
 
-      if (  ret == MBEDTLS_ERR_SSL_WANT_READ || 
+      if (  ret == MBEDTLS_ERR_SSL_WANT_READ ||
             ret == MBEDTLS_ERR_SSL_WANT_WRITE)
          continue;
 
