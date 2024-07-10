@@ -316,14 +316,9 @@ check_enabled SSL BUILTINMBEDTLS 'builtin mbedtls' 'ssl is' false
 check_enabled SSL BUILTINBEARSSL 'builtin bearssl' 'ssl is' false
 
 if [ "$HAVE_SYSTEMMBEDTLS" = "auto" ]; then SYSTEMMBEDTLS_IS_AUTO=yes; else SYSTEMMBEDTLS_IS_AUTO=no; fi
-check_val '' SYSTEMMBEDTLS '-lmbedtls' 'mbedtls' mbedtls 2.5.1 '' true
-check_val '' SYSTEMMBEDX509 '-lmbedx509' 'mbedtls' mbedx509 2.5.1 '' true
-check_val '' SYSTEMMBEDCRYPTO '-lmbedcrypto' 'mbedtls' mbedcrypto 2.5.1 '' true
-if [ "$HAVE_SYSTEMMBEDTLS" = 'yes' ] && [ -z "$SYSTEMMBEDTLS_VERSION" ]; then
-  # Ancient versions (such as the one included in the Ubuntu version used for
-  # build checks) don't have this header
-  check_header '' SYSTEMMBEDTLS mbedtls/net_sockets.h
-fi
+check_val '' SYSTEMMBEDTLS '-lmbedtls' 'mbedtls' mbedtls 2.23.0 '' true
+check_val '' SYSTEMMBEDX509 '-lmbedx509' 'psa' mbedx509 2.23.0 '' true
+check_val '' SYSTEMMBEDCRYPTO '-lmbedcrypto' 'mbedtls' mbedcrypto 2.23.0 '' true
 if [ "$HAVE_SYSTEMMBEDX509" = 'no' ] || [ "$HAVE_SYSTEMMBEDCRYPTO" = 'no' ]; then HAVE_SYSTEMMBEDTLS=no; fi
 if [ "$SYSTEMMBEDTLS_IS_AUTO" = "yes" ] && [ "$HAVE_SYSTEMMBEDTLS" = "yes" ]; then HAVE_SYSTEMMBEDTLS=auto; fi
 
